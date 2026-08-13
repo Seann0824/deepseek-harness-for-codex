@@ -21,9 +21,25 @@ Each run is fresh and asynchronous:
 
 The first run may download the pinned MCP and DeepSeek Harness npm packages. Later runs use the local npm cache.
 
-## Codex plugin installation
+## Codex desktop plugin installation
 
-Once this package and plugin are published, install the plugin from its Codex plugin directory entry. The bundled `.mcp.json` starts `deepseek-harness-mcp@0.2.0`; no separate server setup is required.
+The npm package is the MCP executable; publishing it does not by itself publish a Codex plugin. The Codex plugin is the marketplace entry under `.agents/plugins/marketplace.json` plus `plugins/deepseek-harness-mcp/`. It installs both the MCP configuration and the delegation Skill.
+
+Install the plugin from GitHub:
+
+```sh
+codex plugin marketplace add Seann0824/deepseek-harness-mcp --ref main
+codex plugin add deepseek-harness-mcp@deepseek-harness
+```
+
+For local development, add an absolute checkout path instead. On macOS, if another global `codex` shadows the desktop client's executable, use the binary bundled with the app:
+
+```sh
+/Applications/ChatGPT.app/Contents/Resources/codex plugin marketplace add /absolute/path/to/deepseek-harness-mcp
+/Applications/ChatGPT.app/Contents/Resources/codex plugin add deepseek-harness-mcp@deepseek-harness
+```
+
+Start a new Codex task after installation so the new MCP tools and Skill are loaded. The plugin starts the published `deepseek-harness-mcp@0.2.0` package; users do not separately register the MCP server.
 
 For local plugin development, build the package and point `.mcp.json` temporarily at the absolute `dist/bin.mjs` path:
 
@@ -37,10 +53,10 @@ The last command starts a stdio MCP server and is normally launched by Codex rat
 
 ## Standalone MCP installation
 
-The server can also be registered without the plugin:
+Use this only when the Skill and plugin UI entry are not needed:
 
 ```sh
-codex mcp add deepseek-harness -- npx --yes deepseek-harness-mcp@0.2.0
+codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-mcp@0.2.0 -- deepseek-harness-mcp
 ```
 
 Keep `DEEPSEEK_API_KEY` out of shell history. Set it in the environment that starts Codex or place it in the target repository's ignored `.env` file:

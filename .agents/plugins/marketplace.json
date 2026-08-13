@@ -1,0 +1,20 @@
+{
+  "name": "deepseek-harness",
+  "interface": {
+    "displayName": "DeepSeek Harness"
+  },
+  "plugins": [
+    {
+      "name": "deepseek-harness-mcp",
+      "source": {
+        "source": "local",
+        "path": "./plugins/deepseek-harness-mcp"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
