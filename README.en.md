@@ -4,6 +4,10 @@
   <a href="./README.md">简体中文</a> · <strong>English</strong>
 </p>
 
+<p align="center">
+  <img src="./assets/icon.png" width="128" alt="DeepSeek Harness for Codex icon">
+</p>
+
 DeepSeek Harness for Codex lets Codex start [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) locally, return a clickable live-session link, delegate work to it, and then independently review the resulting workspace changes.
 
 ![DeepSeek Harness for Codex demo](./imgs/examples.gif)

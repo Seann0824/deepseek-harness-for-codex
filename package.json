@@ -10,6 +10,7 @@
     "dist/",
     "README.md",
     "README.en.md",
+    "assets/",
     "imgs/",
     "LICENSE"
   ],

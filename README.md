@@ -4,6 +4,10 @@
   <strong>简体中文</strong> · <a href="./README.en.md">English</a>
 </p>
 
+<p align="center">
+  <img src="./assets/icon.png" width="128" alt="DeepSeek Harness for Codex 图标">
+</p>
+
 DeepSeek Harness for Codex 让 Codex 在本地启动 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness)，返回可点击的实时 Web 会话链接，将任务委派给它执行，并由 Codex 独立检查真实的工作区变更。
 
 ![DeepSeek Harness for Codex 演示](./imgs/examples.gif)
