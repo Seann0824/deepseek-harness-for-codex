@@ -1,6 +1,6 @@
 {
   "name": "deep-seek-harness-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Delegate coding work through a visible local DeepSeek Harness Web session and inspect the result from Codex.",
   "author": {
     "name": "DeepSeek Harness MCP contributors"

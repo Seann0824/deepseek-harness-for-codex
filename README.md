@@ -39,7 +39,7 @@ For local development, add an absolute checkout path instead. On macOS, if anoth
 /Applications/ChatGPT.app/Contents/Resources/codex plugin add deepseek-harness-mcp@deepseek-harness
 ```
 
-Start a new Codex task after installation so the new MCP tools and Skill are loaded. The plugin starts the published `deepseek-harness-mcp@0.2.0` package; users do not separately register the MCP server.
+Start a new Codex task after installation so the new MCP tools and Skill are loaded. The plugin starts the published `deepseek-harness-mcp@0.2.1` package; users do not separately register the MCP server.
 
 For local plugin development, build the package and point `.mcp.json` temporarily at the absolute `dist/bin.mjs` path:
 
@@ -56,7 +56,7 @@ The last command starts a stdio MCP server and is normally launched by Codex rat
 Use this only when the Skill and plugin UI entry are not needed:
 
 ```sh
-codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-mcp@0.2.0 -- deepseek-harness-mcp
+codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-mcp@0.2.1 -- deepseek-harness-mcp
 ```
 
 Keep `DEEPSEEK_API_KEY` out of shell history. Set it in the environment that starts Codex or place it in the target repository's ignored `.env` file:
@@ -118,7 +118,7 @@ Inspect exactly what would be uploaded:
 npm run release:check
 ```
 
-Publish version `0.2.0`:
+Publish version `0.2.1`:
 
 ```sh
 npm publish
@@ -128,7 +128,7 @@ Then verify the public package and executable:
 
 ```sh
 npm view deepseek-harness-mcp version --registry=https://registry.npmjs.org/
-npx --yes deepseek-harness-mcp@0.2.0
+npx --yes --package=deepseek-harness-mcp@0.2.1 -- deepseek-harness-mcp
 ```
 
 An npm version cannot be overwritten. For later releases, update references in `package.json`, `.mcp.json`, and the MCP server metadata together, then run `npm version patch`, `npm version minor`, or `npm version major` as appropriate before publishing.

@@ -1,6 +1,6 @@
 {
   "name": "deepseek-harness-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "MCP server and Codex plugin for controlling visible local DeepSeek Harness Web sessions.",
   "type": "module",
   "bin": {

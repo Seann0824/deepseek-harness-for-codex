@@ -25,7 +25,7 @@ function failure(error: unknown) {
 /** Creates the MCP tool surface over a local run manager. */
 export function createMcpServer(manager: RunManager = new RunManager()): McpServer {
   const server = new McpServer(
-    { name: "deepseek-harness-mcp", version: "0.2.0" },
+    { name: "deepseek-harness-mcp", version: "0.2.1" },
     {
       instructions:
         "Start the local DeepSeek Harness Web service, open its page for the user, submit coding tasks into visible Web sessions, then inspect workspace changes independently.",
