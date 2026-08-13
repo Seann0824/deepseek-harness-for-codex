@@ -25,10 +25,10 @@ function failure(error: unknown) {
 /** Creates the MCP tool surface over a local run manager. */
 export function createMcpServer(manager: RunManager = new RunManager()): McpServer {
   const server = new McpServer(
-    { name: "deepseek-harness-for-codex", version: "0.3.0" },
+    { name: "deepseek-harness-for-codex", version: "0.3.1" },
     {
       instructions:
-        "Start the local DeepSeek Harness Web service, open its page for the user, submit coding tasks into visible Web sessions, then inspect workspace changes independently.",
+        "Start the local DeepSeek Harness Web service, return a clickable session URL, submit coding tasks into visible Web sessions, then inspect workspace changes independently. Do not open the browser unless the user explicitly requests it.",
     },
   );
 
@@ -36,10 +36,10 @@ export function createMcpServer(manager: RunManager = new RunManager()): McpServ
     "start_service",
     {
       title: "Start the local DeepSeek Harness Web UI",
-      description: "Start or reuse a local Harness Web service for an absolute workspace and open the page in the user's browser by default.",
+      description: "Start or reuse a local Harness Web service for an absolute workspace and return its URL without opening a browser by default.",
       inputSchema: {
         workspace: z.string().min(1).describe("Absolute repository path served by DeepSeek Harness."),
-        openBrowser: z.boolean().default(true).describe("Open the Harness page in the default browser after readiness."),
+        openBrowser: z.boolean().default(false).describe("Open the Harness page after readiness. Keep false unless the user explicitly requested it."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -105,7 +105,7 @@ export function createMcpServer(manager: RunManager = new RunManager()): McpServ
         task: z.string().min(1).max(100_000).describe("Complete implementation task, constraints, and acceptance checks for DeepSeek Harness."),
         workspace: z.string().min(1).describe("Absolute path of the repository DeepSeek Harness may inspect and modify."),
         sessionId: z.string().min(1).optional().describe("Completed Harness session to continue. Pass a sessionId returned by an earlier run in this workspace, or omit it to create a new session."),
-        openBrowser: z.boolean().default(true).describe("Open the live Harness Web page for the user."),
+        openBrowser: z.boolean().default(false).describe("Open the live Harness Web page. Keep false unless the user explicitly requested it."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },

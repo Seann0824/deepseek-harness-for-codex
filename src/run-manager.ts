@@ -163,7 +163,7 @@ export class RunManager {
         this.starts.delete(workspace);
       }
     }
-    if ((input.openBrowser ?? true) && service.webUrl !== null) {
+    if ((input.openBrowser ?? false) && service.webUrl !== null) {
       try {
         await this.openBrowserImpl(service.webUrl);
         service.browserOpened = true;
@@ -202,7 +202,7 @@ export class RunManager {
     return this.serviceSnapshot(service);
   }
 
-  /** Starts or continues a Web session, opens its UI by default, and submits the task through Harness RPC. */
+  /** Starts or continues a Web session and submits the task through Harness RPC. */
   public async start(input: StartRunInput): Promise<RunSnapshot> {
     const task = input.task.trim();
     if (!task) throw new Error("task must not be empty.");
@@ -243,7 +243,7 @@ export class RunManager {
       this.activeSessions.delete(activeSessionKey);
       throw error;
     }
-    if (input.openBrowser ?? true) {
+    if (input.openBrowser ?? false) {
       try {
         await this.openService(service.serviceId);
       } catch (error) {

@@ -4,12 +4,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RunManager } from "../src/run-manager.js";
 import type { HarnessCommand } from "../src/runtime.js";
 import { createMcpServer } from "../src/server.js";
 
 const fixture = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "fake-harness.mjs");
+const openBrowser = vi.fn(async () => undefined);
 
 describe("MCP server", () => {
   let temporaryRoot: string;
@@ -19,6 +20,7 @@ describe("MCP server", () => {
   let server: ReturnType<typeof createMcpServer>;
 
   beforeEach(async () => {
+    openBrowser.mockClear();
     temporaryRoot = await mkdtemp(join(tmpdir(), "deep-seek-harness-mcp-server-"));
     workspace = join(temporaryRoot, "workspace");
     await mkdir(workspace);
@@ -27,7 +29,7 @@ describe("MCP server", () => {
       allowedRoots: [temporaryRoot],
       startupTimeoutMs: 2_000,
       pollIntervalMs: 10,
-      openBrowser: async () => undefined,
+      openBrowser,
       commandFactory: ({ workspace: cwd }): HarnessCommand => ({
         command: process.execPath,
         args: [fixture],
@@ -101,6 +103,7 @@ describe("MCP server", () => {
       status: "succeeded",
       assistantText: "completed:MCP follow-up",
     });
+    expect(openBrowser).not.toHaveBeenCalled();
   });
 
   it("returns a tool error for an invalid workspace", async () => {

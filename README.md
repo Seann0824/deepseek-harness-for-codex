@@ -4,7 +4,7 @@
   <strong>简体中文</strong> · <a href="./README.en.md">English</a>
 </p>
 
-DeepSeek Harness for Codex 让 Codex 在本地启动 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness)，打开可见的实时 Web 会话，将任务委派给它执行，并由 Codex 独立检查真实的工作区变更。
+DeepSeek Harness for Codex 让 Codex 在本地启动 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness)，返回可点击的实时 Web 会话链接，将任务委派给它执行，并由 Codex 独立检查真实的工作区变更。
 
 ![DeepSeek Harness for Codex 演示](./imgs/examples.gif)
 
@@ -47,9 +47,9 @@ CODEX_APP_BIN="/Applications/ChatGPT.app/Contents/Resources/codex"
 
 插件会在新任务启动时加载。安装完成后新建一个 Codex 任务，并要求它使用 DeepSeek Harness，例如：
 
-> 使用 DeepSeek Harness 在可见的本地会话中实现这个需求。保持 Harness 网页打开，让我可以查看执行过程；完成后由你检查 diff 并运行相关测试。
+> 使用 DeepSeek Harness 在可见的本地会话中实现这个需求。不要自动打开浏览器，把 Harness 实时页面链接发给我；完成后由你检查 diff 并运行相关测试。
 
-Codex 会在本地启动 Harness，在空闲的回环端口打开 Web 页面，提交任务并跟踪同一个可见会话，最后独立验收结果。你不需要手动启动 Harness，也不需要另外注册 MCP 服务。
+Codex 会在本地启动 Harness，在空闲的回环端口提供 Web 页面，返回可点击链接，提交任务并跟踪同一个可见会话，最后独立验收结果。浏览器不会自动打开；需要查看过程时，由你点击 Codex 消息中的链接。你不需要手动启动 Harness，也不需要另外注册 MCP 服务。
 
 首次运行可能会下载固定版本的 MCP 和 Harness npm 包，后续运行会使用本地 npm 缓存。
 
@@ -85,20 +85,20 @@ codex plugin marketplace remove deepseek-harness-for-codex
 仅当你只需要 MCP 工具、不需要插件的委派工作流和 Codex UI 入口时使用：
 
 ```sh
-codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-for-codex@0.3.0 -- deepseek-harness-for-codex
+codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-for-codex@0.3.1 -- deepseek-harness-for-codex
 ```
 
 注册完成后新建一个 Codex 任务。
 
 ## 工作原理
 
-插件通过 `npx` 启动已发布的 MCP 服务。某个工作区首次运行任务时，MCP 服务会在本地回环地址执行 `@deepseek-ai/dsh web --port 0`，并在默认浏览器中打开对应 URL。Codex 通过 Harness Web API 创建工作区和会话，因此浏览器和 Codex 看到的是同一个实时任务。后续任务会复用该本地服务，不会通过托管中转服务执行。
+插件通过 `npx` 启动已发布的 MCP 服务。某个工作区首次运行任务时，MCP 服务会在本地回环地址执行 `@deepseek-ai/dsh web --port 0`，但不会自动打开浏览器。Codex 通过 Harness Web API 创建工作区和会话，并把对应 URL 作为可点击链接发给用户，因此用户按需打开后看到的就是 Codex 正在控制的实时任务。后续任务会复用该本地服务，不会通过托管中转服务执行。
 
 每次运行都是异步任务：
 
 1. Codex 使用绝对工作区路径和完整任务调用 `start_run`。
-2. MCP 服务启动或复用 Harness Web，打开页面并提交可见会话。
-3. 用户在浏览器查看过程时，Codex 通过 `wait_run` 或 `get_run` 跟踪同一会话。
+2. MCP 服务启动或复用 Harness Web，提交可见会话，并向 Codex 返回页面链接。
+3. Codex 展示可点击链接；用户需要时手动打开，同时 Codex 通过 `wait_run` 或 `get_run` 跟踪同一会话。
 4. Codex 检查实际 diff，并运行自己的验证流程。
 
 ## MCP 工具
@@ -106,8 +106,8 @@ codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-for-codex
 | 工具 | 用途 |
 | --- | --- |
 | `doctor` | 检查 Node、npx、包版本、凭据可见性、数据目录和工作区限制。 |
-| `start_service` | 为工作区启动或复用 Harness Web，并打开浏览器。 |
-| `open_service` | 重新打开正在运行的 Harness 页面。 |
+| `start_service` | 为工作区启动或复用 Harness Web，并返回页面链接；默认不打开浏览器。 |
+| `open_service` | 在用户明确要求时打开正在运行的 Harness 页面。 |
 | `list_services` | 列出本地 Harness Web 服务及其 URL。 |
 | `stop_service` | 停止 Harness Web 服务。 |
 | `start_run` | 由 Codex 选择创建新会话或继续已完成的会话，然后提交任务。 |
@@ -115,6 +115,8 @@ codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-for-codex
 | `get_run` | 读取 Web 会话状态和助手输出。 |
 | `list_runs` | 列出当前 MCP 服务进程创建的运行记录。 |
 | `cancel_run` | 取消当前 agent turn，同时保留 Web 服务。 |
+
+`start_service` 和 `start_run` 的 `openBrowser` 默认值都是 `false`，插件也会明确传入 `false`。Codex 应把返回的 `webUrl` 渲染成可点击链接；只有用户明确要求 Codex 代为打开时，才使用 `open_service`。
 
 ## 配置
 
@@ -148,7 +150,7 @@ codex plugin marketplace add /absolute/path/to/deepseek-harness-for-codex
 codex plugin add deepseek-harness@deepseek-harness-for-codex
 ```
 
-正常安装的插件会启动已发布的 `deepseek-harness-for-codex@0.3.0`。开发本地 MCP 时，可以临时把插件 `.mcp.json` 指向 `dist/bin.mjs` 的绝对路径。
+正常安装的插件会启动已发布的 `deepseek-harness-for-codex@0.3.1`。开发本地 MCP 时，可以临时把插件 `.mcp.json` 指向 `dist/bin.mjs` 的绝对路径。
 
 ## 发布 npm 包
 
@@ -167,7 +169,7 @@ npm whoami --registry=https://registry.npmjs.org/
 npm run release:check
 npm publish
 npm view deepseek-harness-for-codex version --registry=https://registry.npmjs.org/
-npx --yes --package=deepseek-harness-for-codex@0.3.0 -- deepseek-harness-for-codex
+npx --yes --package=deepseek-harness-for-codex@0.3.1 -- deepseek-harness-for-codex
 ```
 
 npm 版本不能被覆盖。后续发布前，需要同步更新 `package.json`、`.mcp.json` 和 MCP 服务元数据中的版本引用，然后执行 `npm version patch`、`npm version minor` 或 `npm version major`。

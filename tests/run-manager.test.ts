@@ -49,6 +49,15 @@ describe("RunManager Web orchestration", () => {
     expect((await fetch(service.webUrl!)).status).toBe(200);
   });
 
+  it("starts the Web service without opening its page by default", async () => {
+    const service = await manager.startService({ workspace });
+
+    expect(service.status).toBe("running");
+    expect(service.webUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    expect(service.browserOpened).toBe(false);
+    expect(openBrowser).not.toHaveBeenCalled();
+  });
+
   it("submits the task into the visible Web session", async () => {
     const started = await manager.start({ task: "implement feature", workspace, openBrowser: true });
     expect(started.status).toBe("running");
@@ -69,7 +78,7 @@ describe("RunManager Web orchestration", () => {
     expect(second.serviceId).toBe(first.serviceId);
     expect(second.sessionId).not.toBe(first.sessionId);
     expect(manager.listServices()).toHaveLength(1);
-    expect(openBrowser).toHaveBeenCalledTimes(2);
+    expect(openBrowser).not.toHaveBeenCalled();
   });
 
   it("lets the caller continue a completed session without returning earlier output", async () => {

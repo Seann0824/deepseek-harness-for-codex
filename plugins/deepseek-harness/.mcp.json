@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "--yes",
-        "--package=deepseek-harness-for-codex@0.3.0",
+        "--package=deepseek-harness-for-codex@0.3.1",
         "--",
         "deepseek-harness-for-codex"
       ],

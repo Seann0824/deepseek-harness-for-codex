@@ -4,7 +4,7 @@
   <a href="./README.md">简体中文</a> · <strong>English</strong>
 </p>
 
-DeepSeek Harness for Codex lets Codex start [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) locally, open its live Web session for you, delegate work to it, and then independently review the resulting workspace changes.
+DeepSeek Harness for Codex lets Codex start [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) locally, return a clickable live-session link, delegate work to it, and then independently review the resulting workspace changes.
 
 ![DeepSeek Harness for Codex demo](./imgs/examples.gif)
 
@@ -47,9 +47,9 @@ CODEX_APP_BIN="/Applications/ChatGPT.app/Contents/Resources/codex"
 
 Plugins are loaded when a task starts. Create a new task in Codex and ask it to use DeepSeek Harness, for example:
 
-> Use DeepSeek Harness to implement this change in a visible local session. Keep the Harness Web page open so I can follow the work, then review the diff and run the relevant checks yourself.
+> Use DeepSeek Harness to implement this change in a visible local session. Do not open my browser automatically; give me the live Harness page link, then review the diff and run the relevant checks yourself.
 
-Codex will start Harness locally, open its Web page on a free loopback port, submit the task, follow the visible session, and independently verify the result. You do not need to run Harness or register a separate MCP server.
+Codex will start Harness locally, serve its Web page on a free loopback port, return a clickable link, submit the task, follow the visible session, and independently verify the result. The browser does not open automatically; click the link in Codex when you want to watch. You do not need to run Harness or register a separate MCP server.
 
 The first task may download the pinned MCP and Harness npm packages. Later tasks use the local npm cache.
 
@@ -85,20 +85,20 @@ codex plugin marketplace remove deepseek-harness-for-codex
 Use this only when you need the MCP tools without the plugin's delegation instructions and Codex UI entry:
 
 ```sh
-codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-for-codex@0.3.0 -- deepseek-harness-for-codex
+codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-for-codex@0.3.1 -- deepseek-harness-for-codex
 ```
 
 Start a new Codex task after registration.
 
 ## How it works
 
-The plugin launches the published MCP server through `npx`. On the first task for a workspace, the MCP server starts `@deepseek-ai/dsh web --port 0` on loopback and opens its URL in the default browser. Codex creates the workspace and session through Harness's Web API, so the browser and Codex observe the same live task. Later tasks reuse that local service. The task does not run on a hosted bridge.
+The plugin launches the published MCP server through `npx`. On the first task for a workspace, the MCP server starts `@deepseek-ai/dsh web --port 0` on loopback without opening a browser. Codex creates the workspace and session through Harness's Web API and presents the URL as a clickable link, so opening it shows the same live task that Codex controls. Later tasks reuse that local service. The task does not run on a hosted bridge.
 
 Each run is fresh and asynchronous:
 
 1. Codex calls `start_run` with an absolute workspace and a complete task.
-2. The MCP server starts or reuses Harness Web, opens the page, and submits a visible session.
-3. Codex follows the session with `wait_run` or `get_run` while the user watches it in the browser.
+2. The MCP server starts or reuses Harness Web, submits a visible session, and returns its page URL to Codex.
+3. Codex presents a clickable link; the user opens it when needed while Codex follows the same session with `wait_run` or `get_run`.
 4. Codex inspects the resulting diff and runs its own verification.
 
 ## MCP tools
@@ -106,8 +106,8 @@ Each run is fresh and asynchronous:
 | Tool | Purpose |
 | --- | --- |
 | `doctor` | Check Node, npx, package selection, credential visibility, data location, and workspace restrictions. |
-| `start_service` | Start or reuse Harness Web for a workspace and open the browser. |
-| `open_service` | Reopen a running Harness page. |
+| `start_service` | Start or reuse Harness Web for a workspace and return its URL without opening the browser by default. |
+| `open_service` | Open a running Harness page when the user explicitly requests it. |
 | `list_services` | List local Harness Web services and URLs. |
 | `stop_service` | Stop a Harness Web service. |
 | `start_run` | Create a new visible session or continue a completed session selected by Codex, then submit a task. |
@@ -115,6 +115,8 @@ Each run is fresh and asynchronous:
 | `get_run` | Read state and assistant text from the Web session. |
 | `list_runs` | List runs owned by the current MCP server process. |
 | `cancel_run` | Cancel the agent turn while keeping Web available. |
+
+Both `start_service` and `start_run` default `openBrowser` to `false`, and the plugin explicitly passes `false`. Codex should render the returned `webUrl` as a clickable link; it should use `open_service` only when the user explicitly asks Codex to open the page.
 
 ## Configuration
 
@@ -148,7 +150,7 @@ codex plugin marketplace add /absolute/path/to/deepseek-harness-for-codex
 codex plugin add deepseek-harness@deepseek-harness-for-codex
 ```
 
-The installed plugin normally starts the published `deepseek-harness-for-codex@0.3.0` package. During local MCP development, temporarily point the plugin's `.mcp.json` at the absolute `dist/bin.mjs` path.
+The installed plugin normally starts the published `deepseek-harness-for-codex@0.3.1` package. During local MCP development, temporarily point the plugin's `.mcp.json` at the absolute `dist/bin.mjs` path.
 
 ## Publishing the npm package
 
@@ -167,7 +169,7 @@ Inspect the release, publish it, and verify the executable:
 npm run release:check
 npm publish
 npm view deepseek-harness-for-codex version --registry=https://registry.npmjs.org/
-npx --yes --package=deepseek-harness-for-codex@0.3.0 -- deepseek-harness-for-codex
+npx --yes --package=deepseek-harness-for-codex@0.3.1 -- deepseek-harness-for-codex
 ```
 
 An npm version cannot be overwritten. For later releases, update references in `package.json`, `.mcp.json`, and the MCP server metadata together, then run `npm version patch`, `npm version minor`, or `npm version major` before publishing.
