@@ -1,0 +1,49 @@
+{
+  "name": "deepseek-harness-mcp",
+  "version": "0.1.0",
+  "description": "MCP server and Codex plugin for controlling a local DeepSeek Harness process.",
+  "type": "module",
+  "bin": {
+    "deepseek-harness-mcp": "dist/bin.mjs"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "packageManager": "npm@10.9.4",
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "release:check": "npm run check && npm pack --dry-run",
+    "prepublishOnly": "npm run check"
+  },
+  "keywords": [
+    "codex",
+    "deepseek",
+    "mcp",
+    "model-context-protocol",
+    "agent"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.0",
+    "tsdown": "0.22.14",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}

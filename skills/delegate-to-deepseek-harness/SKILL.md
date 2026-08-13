@@ -1,0 +1,25 @@
+---
+name: delegate-to-deepseek-harness
+description: Delegate a scoped coding task from Codex to a locally started DeepSeek Harness process, monitor the run, then independently review and verify the workspace changes. Use when the user asks Codex to use, control, or hand work to DeepSeek Harness.
+---
+
+# Delegate to DeepSeek Harness
+
+Use the `deepseek-harness` MCP tools to run DeepSeek Harness locally. Codex remains responsible for the task outcome and must inspect the changed files and run appropriate verification itself.
+
+## Workflow
+
+1. Call `doctor` before the first run in a task. Explain any failed prerequisite. A DeepSeek API key may come from the MCP environment or the target workspace's uncommitted `.env` file.
+2. Inspect the target repository enough to write a concrete delegation prompt. Include the requested outcome, relevant repository instructions, scope limits, and acceptance checks. Do not include credentials.
+3. Call `start_run` exactly once for that attempt. Pass the repository's absolute path as `workspace`. A timeout or delayed response is not permission to start a duplicate run.
+4. Call `wait_run` with a timeout of at most 30 seconds. On later calls, pass both returned `nextCursor` values so output is not repeated. Continue until the run is `succeeded`, `failed`, or `cancelled`.
+5. Treat the Harness response as a handoff report, not proof. Inspect the actual workspace diff, preserve unrelated user changes, and run the smallest checks that cover the change.
+6. If review finds a concrete defect, start a fresh correction run in the same workspace with the defect and failed check stated precisely. Review the correction again.
+7. Call `cancel_run` only when the user replaces the task, the run is clearly stuck, or continuing would be unsafe.
+
+## Safety
+
+- DeepSeek Harness starts as a local child process and receives access to the requested workspace. Do not pass a broader directory than needed.
+- The default permission mode is `workspace-write`. Do not switch to `danger-full-access` unless the user explicitly authorizes that broader access.
+- Do not ask Harness to commit, push, publish, deploy, or contact external systems unless the user explicitly requested that action.
+- Each run is a fresh headless session. Give follow-up feedback by starting a new run against the existing workspace.
