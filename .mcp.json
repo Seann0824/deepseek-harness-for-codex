@@ -2,7 +2,7 @@
   "mcpServers": {
     "deepseek-harness": {
       "command": "npx",
-      "args": ["--yes", "--package=deepseek-harness-mcp@0.2.1", "--", "deepseek-harness-mcp"],
+      "args": ["--yes", "--package=deepseek-harness-mcp@0.2.2", "--", "deepseek-harness-mcp"],
       "env_vars": [
         "DEEPSEEK_API_KEY",
         "DEEPSEEK_BASE_URL",
