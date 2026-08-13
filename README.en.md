@@ -74,7 +74,7 @@ codex plugin marketplace remove deepseek-harness
 Use this only when you need the MCP tools without the plugin's delegation instructions and Codex UI entry:
 
 ```sh
-codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-mcp@0.2.2 -- deepseek-harness-mcp
+codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-mcp@0.2.3 -- deepseek-harness-mcp
 ```
 
 Start a new Codex task after registration.
@@ -137,7 +137,7 @@ codex plugin marketplace add /absolute/path/to/deepseek-harness-mcp
 codex plugin add deepseek-harness-mcp@deepseek-harness
 ```
 
-The installed plugin normally starts the published `deepseek-harness-mcp@0.2.2` package. During local MCP development, temporarily point the plugin's `.mcp.json` at the absolute `dist/bin.mjs` path.
+The installed plugin normally starts the published `deepseek-harness-mcp@0.2.3` package. During local MCP development, temporarily point the plugin's `.mcp.json` at the absolute `dist/bin.mjs` path.
 
 ## Publishing the MCP package
 
@@ -156,7 +156,7 @@ Inspect the release, publish it, and verify the executable:
 npm run release:check
 npm publish
 npm view deepseek-harness-mcp version --registry=https://registry.npmjs.org/
-npx --yes --package=deepseek-harness-mcp@0.2.2 -- deepseek-harness-mcp
+npx --yes --package=deepseek-harness-mcp@0.2.3 -- deepseek-harness-mcp
 ```
 
 An npm version cannot be overwritten. For later releases, update references in `package.json`, `.mcp.json`, and the MCP server metadata together, then run `npm version patch`, `npm version minor`, or `npm version major` before publishing.

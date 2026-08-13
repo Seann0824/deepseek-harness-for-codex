@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "--yes",
-        "--package=deepseek-harness-mcp@0.2.2",
+        "--package=deepseek-harness-mcp@0.2.3",
         "--",
         "deepseek-harness-mcp"
       ],

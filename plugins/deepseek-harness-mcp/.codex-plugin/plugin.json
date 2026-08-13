@@ -1,6 +1,6 @@
 {
   "name": "deepseek-harness-mcp",
-  "version": "0.2.2+codex.20260813194551",
+  "version": "0.2.3+codex.20260813200757",
   "description": "Run DeepSeek Harness locally in a visible Web session controlled and reviewed by Codex.",
   "author": {
     "name": "DeepSeek Harness MCP contributors"
