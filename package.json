@@ -9,8 +9,18 @@
   "files": [
     "dist/",
     "README.md",
+    "README.en.md",
+    "imgs/",
     "LICENSE"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Seann0824/deepseek-harness-mcp.git"
+  },
+  "homepage": "https://github.com/Seann0824/deepseek-harness-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/Seann0824/deepseek-harness-mcp/issues"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
