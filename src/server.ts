@@ -100,10 +100,11 @@ export function createMcpServer(manager: RunManager = new RunManager()): McpServ
     "start_run",
     {
       title: "Start a local DeepSeek Harness run",
-      description: "Start/reuse the Harness Web UI, open it by default, create a visible Web session, and submit the task. Returns runId, sessionId, and webUrl.",
+      description: "Start or reuse the Harness Web UI, then create a new session or continue a completed session selected by Codex. Returns runId, sessionId, sessionReused, and webUrl.",
       inputSchema: {
         task: z.string().min(1).max(100_000).describe("Complete implementation task, constraints, and acceptance checks for DeepSeek Harness."),
         workspace: z.string().min(1).describe("Absolute path of the repository DeepSeek Harness may inspect and modify."),
+        sessionId: z.string().min(1).optional().describe("Completed Harness session to continue. Pass a sessionId returned by an earlier run in this workspace, or omit it to create a new session."),
         openBrowser: z.boolean().default(true).describe("Open the live Harness Web page for the user."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -160,7 +161,7 @@ export function createMcpServer(manager: RunManager = new RunManager()): McpServ
     "list_runs",
     {
       title: "List local DeepSeek Harness runs",
-      description: "List runs started by the current MCP server process without repeating retained output.",
+      description: "List runs started by the current MCP server process, including session IDs Codex may choose to continue in a later start_run call.",
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

@@ -31,16 +31,16 @@ const server = createServer((request, response) => {
       const session = sessions.get(payload.sessionId);
       session.running = true;
       session.task = payload.content[0].text;
-      session.events.push({ event: { type: "turn/start", seq: 0, data: {} } });
+      session.events.push({ event: { type: "turn/start", seq: session.events.length, data: {} } });
       setTimeout(() => {
         session.events.push({
           event: {
             type: "assistant/message",
-            seq: 1,
+            seq: session.events.length,
             data: { message: { content: [{ type: "text", text: `completed:${session.task}` }] } },
           },
         });
-        session.events.push({ event: { type: "turn/end", seq: 2, data: { reason: "stop" } } });
+        session.events.push({ event: { type: "turn/end", seq: session.events.length, data: { reason: "stop" } } });
         session.running = false;
       }, 40);
       value = { accepted: true };

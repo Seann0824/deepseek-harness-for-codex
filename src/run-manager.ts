@@ -32,6 +32,8 @@ interface RunRecord {
   runId: string;
   serviceId: string;
   sessionId: string;
+  sessionReused: boolean;
+  startEventSeq: number;
   task: string;
   workspace: string;
   webUrl: string;
@@ -129,6 +131,7 @@ export class RunManager {
   private readonly serviceByWorkspace = new Map<string, string>();
   private readonly starts = new Map<string, Promise<ServiceRecord>>();
   private readonly runs = new Map<string, RunRecord>();
+  private readonly activeSessions = new Set<string>();
   private readonly dataDirectory: string;
   private readonly allowedRoots: string[];
   private readonly startupTimeoutMs: number;
@@ -199,7 +202,7 @@ export class RunManager {
     return this.serviceSnapshot(service);
   }
 
-  /** Starts a Web session, opens its UI by default, and submits the task through Harness RPC. */
+  /** Starts or continues a Web session, opens its UI by default, and submits the task through Harness RPC. */
   public async start(input: StartRunInput): Promise<RunSnapshot> {
     const task = input.task.trim();
     if (!task) throw new Error("task must not be empty.");
@@ -208,14 +211,38 @@ export class RunManager {
     if (serviceSnapshot.webUrl === null) throw new Error("Harness Web service did not provide a URL.");
     const service = this.requireService(serviceSnapshot.serviceId);
     const workspaceResult = await this.rpc<{ workspace: { workspaceId: string } }>(service, "workspace.create", { path: service.workspace });
-    const session = await this.rpc<{ sessionId: string }>(service, "session.create", {
-      workspaceId: workspaceResult.workspace.workspaceId,
-    });
-    await this.rpc<{ accepted: true }>(service, "session.prompt", {
-      sessionId: session.sessionId,
-      mode: "queue",
-      content: [{ type: "text", text: task }],
-    });
+    const requestedSessionId = input.sessionId?.trim();
+    let sessionId: string;
+    let startEventSeq = -1;
+    if (requestedSessionId === undefined || requestedSessionId === "") {
+      const session = await this.rpc<{ sessionId: string }>(service, "session.create", {
+        workspaceId: workspaceResult.workspace.workspaceId,
+      });
+      sessionId = session.sessionId;
+    } else {
+      const [list, history] = await Promise.all([
+        this.rpc<{ items: SessionSummary[] }>(service, "session.list", {}),
+        this.rpc<{ events: HistoryEvent[] }>(service, "session.history", { sessionId: requestedSessionId, maxMessages: 50 }),
+      ]);
+      const summary = list.items.find((item) => item.sessionId === requestedSessionId);
+      if (summary === undefined) throw new Error(`Unknown sessionId for this workspace: ${requestedSessionId}`);
+      if (summary.running) throw new Error(`Harness session is still running: ${requestedSessionId}`);
+      sessionId = requestedSessionId;
+      startEventSeq = history.events.reduce((highest, entry) => Math.max(highest, entry.event.seq), -1);
+    }
+    const activeSessionKey = `${service.serviceId}:${sessionId}`;
+    if (this.activeSessions.has(activeSessionKey)) throw new Error(`Harness session already has an active MCP run: ${sessionId}`);
+    this.activeSessions.add(activeSessionKey);
+    try {
+      await this.rpc<{ accepted: true }>(service, "session.prompt", {
+        sessionId,
+        mode: "queue",
+        content: [{ type: "text", text: task }],
+      });
+    } catch (error) {
+      this.activeSessions.delete(activeSessionKey);
+      throw error;
+    }
     if (input.openBrowser ?? true) {
       try {
         await this.openService(service.serviceId);
@@ -226,7 +253,9 @@ export class RunManager {
     const run: RunRecord = {
       runId: randomUUID(),
       serviceId: service.serviceId,
-      sessionId: session.sessionId,
+      sessionId,
+      sessionReused: requestedSessionId !== undefined && requestedSessionId !== "",
+      startEventSeq,
       task,
       workspace: service.workspace,
       webUrl: serviceSnapshot.webUrl,
@@ -235,7 +264,7 @@ export class RunManager {
       startedAt: new Date(),
       finishedAt: null,
       assistantText: "",
-      lastEventSeq: -1,
+      lastEventSeq: startEventSeq,
       error: null,
     };
     this.runs.set(run.runId, run);
@@ -353,6 +382,7 @@ export class RunManager {
       run.status = "failed";
       run.error = "Harness Web service stopped before the task completed.";
       run.finishedAt = new Date();
+      this.releaseSession(run);
       return this.runSnapshot(run);
     }
     try {
@@ -361,7 +391,7 @@ export class RunManager {
         this.rpc<{ events: HistoryEvent[] }>(service, "session.history", { sessionId: run.sessionId, maxMessages: 50 }),
       ]);
       const summary = list.items.find((item) => item.sessionId === run.sessionId);
-      const events = history.events;
+      const events = history.events.filter((entry) => entry.event.seq > run.startEventSeq);
       run.lastEventSeq = events.reduce((highest, entry) => Math.max(highest, entry.event.seq), run.lastEventSeq);
       run.assistantText = assistantText(events);
       const agentError = [...events].reverse().find((entry) => entry.event.type === "agent/error");
@@ -377,6 +407,7 @@ export class RunManager {
         run.status = "succeeded";
         run.finishedAt = new Date();
       }
+      if (run.status !== "running") this.releaseSession(run);
     } catch (error) {
       run.error = errorText(error);
     }
@@ -426,6 +457,10 @@ export class RunManager {
     return run;
   }
 
+  private releaseSession(run: RunRecord): void {
+    this.activeSessions.delete(`${run.serviceId}:${run.sessionId}`);
+  }
+
   private async terminate(service: ServiceRecord): Promise<void> {
     if (service.child.exitCode !== null) return;
     const closed = new Promise<void>((resolveClose) => service.child.once("close", () => resolveClose()));
@@ -461,6 +496,7 @@ export class RunManager {
       runId: run.runId,
       serviceId: run.serviceId,
       sessionId: run.sessionId,
+      sessionReused: run.sessionReused,
       task: run.task,
       workspace: run.workspace,
       webUrl: run.webUrl,

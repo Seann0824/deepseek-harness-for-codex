@@ -93,7 +93,7 @@ Each run is fresh and asynchronous:
 | `open_service` | Reopen a running Harness page. |
 | `list_services` | List local Harness Web services and URLs. |
 | `stop_service` | Stop a Harness Web service. |
-| `start_run` | Create a visible Web session and submit a task. |
+| `start_run` | Create a new visible session or continue a completed session selected by Codex, then submit a task. |
 | `wait_run` | Wait up to 30 seconds for the visible session. |
 | `get_run` | Read state and assistant text from the Web session. |
 | `list_runs` | List runs owned by the current MCP server process. |
@@ -118,7 +118,7 @@ Telemetry is disabled for Harness child processes by default. The Web service bi
 
 ## Session model
 
-Every `start_run` creates a new visible Harness Web session. The service is reused for later tasks in the same workspace until `stop_service` or MCP shutdown. Codex can supply correction feedback in a new visible session against the modified workspace and independently verifies the final result.
+Every `start_run` lets Codex choose the session. Omitting `sessionId` creates a new visible Harness session. Passing a completed `sessionId` from an earlier run continues that conversation while returning only the new turn's output. A running session cannot be reused concurrently. The Web service is reused for later tasks in the same workspace until `stop_service` or MCP shutdown.
 
 ## Local development
 

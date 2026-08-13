@@ -23,6 +23,7 @@ export interface RunSnapshot {
   runId: string;
   serviceId: string;
   sessionId: string;
+  sessionReused: boolean;
   task: string;
   workspace: string;
   webUrl: string;
@@ -39,6 +40,7 @@ export interface RunSnapshot {
 export interface StartRunInput {
   task: string;
   workspace: string;
+  sessionId?: string | undefined;
   openBrowser?: boolean | undefined;
 }
 

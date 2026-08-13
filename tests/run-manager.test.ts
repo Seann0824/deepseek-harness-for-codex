@@ -54,6 +54,7 @@ describe("RunManager Web orchestration", () => {
     expect(started.status).toBe("running");
     expect(started.webUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     expect(started.sessionId).toBe("session-1");
+    expect(started.sessionReused).toBe(false);
 
     const completed = await manager.wait(started.runId, 2_000);
     expect(completed.status).toBe("succeeded");
@@ -69,6 +70,36 @@ describe("RunManager Web orchestration", () => {
     expect(second.sessionId).not.toBe(first.sessionId);
     expect(manager.listServices()).toHaveLength(1);
     expect(openBrowser).toHaveBeenCalledTimes(2);
+  });
+
+  it("lets the caller continue a completed session without returning earlier output", async () => {
+    const first = await manager.start({ task: "first", workspace, openBrowser: false });
+    await manager.wait(first.runId, 2_000);
+
+    const second = await manager.start({
+      task: "follow-up",
+      workspace,
+      sessionId: first.sessionId,
+      openBrowser: false,
+    });
+    expect(second.sessionId).toBe(first.sessionId);
+    expect(second.sessionReused).toBe(true);
+
+    const completed = await manager.wait(second.runId, 2_000);
+    expect(completed.status).toBe("succeeded");
+    expect(completed.assistantText).toBe("completed:follow-up");
+    expect(completed.lastEventSeq).toBe(5);
+  });
+
+  it("rejects reuse while the selected session is running", async () => {
+    const first = await manager.start({ task: "first", workspace, openBrowser: false });
+
+    await expect(manager.start({
+      task: "overlap",
+      workspace,
+      sessionId: first.sessionId,
+      openBrowser: false,
+    })).rejects.toThrow("still running");
   });
 
   it("cancels a run but keeps its Web service alive", async () => {

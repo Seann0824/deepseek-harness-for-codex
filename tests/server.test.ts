@@ -83,6 +83,24 @@ describe("MCP server", () => {
       status: "succeeded",
       assistantText: "completed:MCP task",
     });
+
+    const sessionId = (start.structuredContent as { sessionId: string }).sessionId;
+    const followUp = await client.callTool({
+      name: "start_run",
+      arguments: { task: "MCP follow-up", workspace, sessionId },
+    });
+    expect(followUp.isError).not.toBe(true);
+    expect(followUp.structuredContent).toMatchObject({ sessionId, sessionReused: true });
+
+    const followUpRunId = (followUp.structuredContent as { runId: string }).runId;
+    const followUpWait = await client.callTool({
+      name: "wait_run",
+      arguments: { runId: followUpRunId, timeoutMs: 2_000 },
+    });
+    expect(followUpWait.structuredContent).toMatchObject({
+      status: "succeeded",
+      assistantText: "completed:MCP follow-up",
+    });
   });
 
   it("returns a tool error for an invalid workspace", async () => {
