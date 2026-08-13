@@ -1,16 +1,16 @@
 {
-  "name": "deep-seek-harness-mcp",
-  "version": "0.2.3",
+  "name": "deepseek-harness-for-codex",
+  "version": "0.3.0",
   "description": "Delegate coding work through a visible local DeepSeek Harness Web session and inspect the result from Codex.",
   "author": {
-    "name": "DeepSeek Harness MCP contributors"
+    "name": "DeepSeek Harness for Codex contributors"
   },
   "skills": "./skills/",
   "interface": {
-    "displayName": "DeepSeek Harness",
+    "displayName": "DeepSeek Harness for Codex",
     "shortDescription": "Run and watch a local DeepSeek coding agent.",
     "longDescription": "Codex starts the local DeepSeek Harness Web UI, opens it for the user, delegates a scoped coding task into the visible session, and independently reviews the workspace changes.",
-    "developerName": "DeepSeek Harness MCP contributors",
+    "developerName": "DeepSeek Harness for Codex contributors",
     "category": "Developer Tools",
     "capabilities": ["Visible Harness Web UI", "Local agent delegation", "Independent result review"],
     "defaultPrompt": "Open the local DeepSeek Harness Web UI, delegate this coding task into a visible session, then review and verify the result yourself."

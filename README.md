@@ -1,12 +1,12 @@
-# DeepSeek Harness MCP
+# DeepSeek Harness for Codex
 
 <p align="center">
   <strong>简体中文</strong> · <a href="./README.en.md">English</a>
 </p>
 
-DeepSeek Harness MCP 让 Codex 在本地启动 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness)，打开可见的实时 Web 会话，将任务委派给它执行，并由 Codex 独立检查真实的工作区变更。
+DeepSeek Harness for Codex 让 Codex 在本地启动 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness)，打开可见的实时 Web 会话，将任务委派给它执行，并由 Codex 独立检查真实的工作区变更。
 
-![DeepSeek Harness MCP 演示](./imgs/examples.gif)
+![DeepSeek Harness for Codex 演示](./imgs/examples.gif)
 
 ## 快速开始
 
@@ -31,16 +31,16 @@ DEEPSEEK_API_KEY=your-key
 在终端中执行以下两条命令：
 
 ```sh
-codex plugin marketplace add Seann0824/deepseek-harness-mcp --ref main
-codex plugin add deepseek-harness-mcp@deepseek-harness
+codex plugin marketplace add Seann0824/deepseek-harness-for-codex --ref main
+codex plugin add deepseek-harness@deepseek-harness-for-codex
 ```
 
 在 macOS 上，如果找不到 `codex`，或者其他全局安装覆盖了桌面客户端的命令，请直接使用客户端内置的可执行文件：
 
 ```sh
 CODEX_APP_BIN="/Applications/ChatGPT.app/Contents/Resources/codex"
-"$CODEX_APP_BIN" plugin marketplace add Seann0824/deepseek-harness-mcp --ref main
-"$CODEX_APP_BIN" plugin add deepseek-harness-mcp@deepseek-harness
+"$CODEX_APP_BIN" plugin marketplace add Seann0824/deepseek-harness-for-codex --ref main
+"$CODEX_APP_BIN" plugin add deepseek-harness@deepseek-harness-for-codex
 ```
 
 ### 3. 新建 Codex 任务
@@ -53,20 +53,31 @@ Codex 会在本地启动 Harness，在空闲的回环端口打开 Web 页面，�
 
 首次运行可能会下载固定版本的 MCP 和 Harness npm 包，后续运行会使用本地 npm 缓存。
 
+## 从旧名称迁移
+
+项目已从 `deepseek-harness-mcp` 更名为 `deepseek-harness-for-codex`。如果安装过旧版插件，请先移除旧插件和旧市场，再按照上面的“安装插件”重新安装：
+
+```sh
+codex plugin remove deepseek-harness-mcp@deepseek-harness
+codex plugin marketplace remove deepseek-harness
+```
+
+旧版 npm 包不会自动替换为新包。默认数据目录仍保留为 `~/.deep-seek-harness-mcp`，因此重新安装后可以继续使用原有的本地 Harness 设置和会话。
+
 ## 更新
 
 刷新插件市场并重新安装插件，然后新建一个 Codex 任务：
 
 ```sh
-codex plugin marketplace upgrade deepseek-harness
-codex plugin add deepseek-harness-mcp@deepseek-harness
+codex plugin marketplace upgrade deepseek-harness-for-codex
+codex plugin add deepseek-harness@deepseek-harness-for-codex
 ```
 
 ## 卸载
 
 ```sh
-codex plugin remove deepseek-harness-mcp@deepseek-harness
-codex plugin marketplace remove deepseek-harness
+codex plugin remove deepseek-harness@deepseek-harness-for-codex
+codex plugin marketplace remove deepseek-harness-for-codex
 ```
 
 ## 独立安装 MCP
@@ -74,7 +85,7 @@ codex plugin marketplace remove deepseek-harness
 仅当你只需要 MCP 工具、不需要插件的委派工作流和 Codex UI 入口时使用：
 
 ```sh
-codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-mcp@0.2.3 -- deepseek-harness-mcp
+codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-for-codex@0.3.0 -- deepseek-harness-for-codex
 ```
 
 注册完成后新建一个 Codex 任务。
@@ -133,15 +144,15 @@ Harness 子进程默认关闭遥测。Web 服务只绑定回环地址并自动�
 ```sh
 npm install
 npm run check
-codex plugin marketplace add /absolute/path/to/deepseek-harness-mcp
-codex plugin add deepseek-harness-mcp@deepseek-harness
+codex plugin marketplace add /absolute/path/to/deepseek-harness-for-codex
+codex plugin add deepseek-harness@deepseek-harness-for-codex
 ```
 
-正常安装的插件会启动已发布的 `deepseek-harness-mcp@0.2.3`。开发本地 MCP 时，可以临时把插件 `.mcp.json` 指向 `dist/bin.mjs` 的绝对路径。
+正常安装的插件会启动已发布的 `deepseek-harness-for-codex@0.3.0`。开发本地 MCP 时，可以临时把插件 `.mcp.json` 指向 `dist/bin.mjs` 的绝对路径。
 
-## 发布 MCP 包
+## 发布 npm 包
 
-本仓库将无 scope 的公共包 `deepseek-harness-mcp` 发布到 npm 官方 registry。`npm publish` 会自动执行类型检查、测试和构建。发布包包含 `dist/`、中英文 README、演示 GIF、`LICENSE` 和包清单。
+本仓库将无 scope 的公共包 `deepseek-harness-for-codex` 发布到 npm 官方 registry。`npm publish` 会自动执行类型检查、测试和构建。发布包包含 `dist/`、中英文 README、演示 GIF、`LICENSE` 和包清单。
 
 登录并确认 npm 账号：
 
@@ -155,8 +166,8 @@ npm whoami --registry=https://registry.npmjs.org/
 ```sh
 npm run release:check
 npm publish
-npm view deepseek-harness-mcp version --registry=https://registry.npmjs.org/
-npx --yes --package=deepseek-harness-mcp@0.2.3 -- deepseek-harness-mcp
+npm view deepseek-harness-for-codex version --registry=https://registry.npmjs.org/
+npx --yes --package=deepseek-harness-for-codex@0.3.0 -- deepseek-harness-for-codex
 ```
 
 npm 版本不能被覆盖。后续发布前，需要同步更新 `package.json`、`.mcp.json` 和 MCP 服务元数据中的版本引用，然后执行 `npm version patch`、`npm version minor` 或 `npm version major`。

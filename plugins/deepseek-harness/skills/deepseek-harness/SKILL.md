@@ -1,9 +1,9 @@
 ---
-name: delegate-to-deepseek-harness
+name: deepseek-harness
 description: Start the local DeepSeek Harness Web UI, open it for the user, delegate a scoped coding task into a visible Web session, then independently review and verify the workspace changes. Use when the user asks Codex to use, show, control, or hand work to DeepSeek Harness.
 ---
 
-# Delegate to DeepSeek Harness
+# DeepSeek Harness
 
 Use the `deepseek-harness` MCP tools to run DeepSeek Harness locally through its Web UI. The user must be able to watch the same session that Codex controls. Codex remains responsible for the task outcome and must inspect the changed files and run appropriate verification itself.
 

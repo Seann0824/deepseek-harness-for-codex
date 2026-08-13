@@ -1,12 +1,12 @@
-# DeepSeek Harness MCP
+# DeepSeek Harness for Codex
 
 <p align="center">
   <a href="./README.md">简体中文</a> · <strong>English</strong>
 </p>
 
-DeepSeek Harness MCP lets Codex start [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) locally, open its live Web session for you, delegate work to it, and then independently review the resulting workspace changes.
+DeepSeek Harness for Codex lets Codex start [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) locally, open its live Web session for you, delegate work to it, and then independently review the resulting workspace changes.
 
-![DeepSeek Harness MCP demo](./imgs/examples.gif)
+![DeepSeek Harness for Codex demo](./imgs/examples.gif)
 
 ## Quick start
 
@@ -31,16 +31,16 @@ Do not commit this file. You can instead provide `DEEPSEEK_API_KEY` to the envir
 Copy these two commands into a terminal:
 
 ```sh
-codex plugin marketplace add Seann0824/deepseek-harness-mcp --ref main
-codex plugin add deepseek-harness-mcp@deepseek-harness
+codex plugin marketplace add Seann0824/deepseek-harness-for-codex --ref main
+codex plugin add deepseek-harness@deepseek-harness-for-codex
 ```
 
 On macOS, if `codex` is not found or another global installation shadows the desktop client, use the executable bundled with the app:
 
 ```sh
 CODEX_APP_BIN="/Applications/ChatGPT.app/Contents/Resources/codex"
-"$CODEX_APP_BIN" plugin marketplace add Seann0824/deepseek-harness-mcp --ref main
-"$CODEX_APP_BIN" plugin add deepseek-harness-mcp@deepseek-harness
+"$CODEX_APP_BIN" plugin marketplace add Seann0824/deepseek-harness-for-codex --ref main
+"$CODEX_APP_BIN" plugin add deepseek-harness@deepseek-harness-for-codex
 ```
 
 ### 3. Start a new Codex task
@@ -53,20 +53,31 @@ Codex will start Harness locally, open its Web page on a free loopback port, sub
 
 The first task may download the pinned MCP and Harness npm packages. Later tasks use the local npm cache.
 
+## Migrating from the old name
+
+The project was renamed from `deepseek-harness-mcp` to `deepseek-harness-for-codex`. If you installed the old plugin, remove its plugin and marketplace before following the installation steps above:
+
+```sh
+codex plugin remove deepseek-harness-mcp@deepseek-harness
+codex plugin marketplace remove deepseek-harness
+```
+
+The old npm package is not replaced automatically. The default data directory remains `~/.deep-seek-harness-mcp`, so the new installation can continue using existing local Harness settings and sessions.
+
 ## Update
 
 Refresh the marketplace and reinstall the plugin, then start a new Codex task:
 
 ```sh
-codex plugin marketplace upgrade deepseek-harness
-codex plugin add deepseek-harness-mcp@deepseek-harness
+codex plugin marketplace upgrade deepseek-harness-for-codex
+codex plugin add deepseek-harness@deepseek-harness-for-codex
 ```
 
 ## Uninstall
 
 ```sh
-codex plugin remove deepseek-harness-mcp@deepseek-harness
-codex plugin marketplace remove deepseek-harness
+codex plugin remove deepseek-harness@deepseek-harness-for-codex
+codex plugin marketplace remove deepseek-harness-for-codex
 ```
 
 ## Standalone MCP installation
@@ -74,7 +85,7 @@ codex plugin marketplace remove deepseek-harness
 Use this only when you need the MCP tools without the plugin's delegation instructions and Codex UI entry:
 
 ```sh
-codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-mcp@0.2.3 -- deepseek-harness-mcp
+codex mcp add deepseek-harness -- npx --yes --package=deepseek-harness-for-codex@0.3.0 -- deepseek-harness-for-codex
 ```
 
 Start a new Codex task after registration.
@@ -133,15 +144,15 @@ Clone this repository, build the npm package, then add the checkout as a local m
 ```sh
 npm install
 npm run check
-codex plugin marketplace add /absolute/path/to/deepseek-harness-mcp
-codex plugin add deepseek-harness-mcp@deepseek-harness
+codex plugin marketplace add /absolute/path/to/deepseek-harness-for-codex
+codex plugin add deepseek-harness@deepseek-harness-for-codex
 ```
 
-The installed plugin normally starts the published `deepseek-harness-mcp@0.2.3` package. During local MCP development, temporarily point the plugin's `.mcp.json` at the absolute `dist/bin.mjs` path.
+The installed plugin normally starts the published `deepseek-harness-for-codex@0.3.0` package. During local MCP development, temporarily point the plugin's `.mcp.json` at the absolute `dist/bin.mjs` path.
 
-## Publishing the MCP package
+## Publishing the npm package
 
-This repository publishes the public, unscoped `deepseek-harness-mcp` package to the official npm registry. `npm publish` automatically runs the typecheck, test, and build gate. The package includes `dist/`, both README files, the demo GIF, `LICENSE`, and the package manifest.
+This repository publishes the public, unscoped `deepseek-harness-for-codex` package to the official npm registry. `npm publish` automatically runs the typecheck, test, and build gate. The package includes `dist/`, both README files, the demo GIF, `LICENSE`, and the package manifest.
 
 Authenticate and verify the account:
 
@@ -155,8 +166,8 @@ Inspect the release, publish it, and verify the executable:
 ```sh
 npm run release:check
 npm publish
-npm view deepseek-harness-mcp version --registry=https://registry.npmjs.org/
-npx --yes --package=deepseek-harness-mcp@0.2.3 -- deepseek-harness-mcp
+npm view deepseek-harness-for-codex version --registry=https://registry.npmjs.org/
+npx --yes --package=deepseek-harness-for-codex@0.3.0 -- deepseek-harness-for-codex
 ```
 
 An npm version cannot be overwritten. For later releases, update references in `package.json`, `.mcp.json`, and the MCP server metadata together, then run `npm version patch`, `npm version minor`, or `npm version major` before publishing.

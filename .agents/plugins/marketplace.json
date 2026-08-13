@@ -1,14 +1,14 @@
 {
-  "name": "deepseek-harness",
+  "name": "deepseek-harness-for-codex",
   "interface": {
-    "displayName": "DeepSeek Harness"
+    "displayName": "DeepSeek Harness for Codex"
   },
   "plugins": [
     {
-      "name": "deepseek-harness-mcp",
+      "name": "deepseek-harness",
       "source": {
         "source": "local",
-        "path": "./plugins/deepseek-harness-mcp"
+        "path": "./plugins/deepseek-harness"
       },
       "policy": {
         "installation": "AVAILABLE",

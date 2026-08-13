@@ -1,10 +1,10 @@
 {
-  "name": "deepseek-harness-mcp",
-  "version": "0.2.3",
-  "description": "MCP server and Codex plugin for controlling visible local DeepSeek Harness Web sessions.",
+  "name": "deepseek-harness-for-codex",
+  "version": "0.3.0",
+  "description": "Codex plugin for delegating work to visible local DeepSeek Harness sessions and independently reviewing the results.",
   "type": "module",
   "bin": {
-    "deepseek-harness-mcp": "dist/bin.mjs"
+    "deepseek-harness-for-codex": "dist/bin.mjs"
   },
   "files": [
     "dist/",
@@ -15,11 +15,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Seann0824/deepseek-harness-mcp.git"
+    "url": "git+https://github.com/Seann0824/deepseek-harness-for-codex.git"
   },
-  "homepage": "https://github.com/Seann0824/deepseek-harness-mcp#readme",
+  "homepage": "https://github.com/Seann0824/deepseek-harness-for-codex#readme",
   "bugs": {
-    "url": "https://github.com/Seann0824/deepseek-harness-mcp/issues"
+    "url": "https://github.com/Seann0824/deepseek-harness-for-codex/issues"
   },
   "publishConfig": {
     "access": "public",
