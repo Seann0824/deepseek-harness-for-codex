@@ -1,37 +1,49 @@
-/** Lifecycle state for one locally launched DeepSeek Harness process. */
+/** Lifecycle state for one task submitted through the Harness Web service. */
 export type RunStatus = "running" | "succeeded" | "failed" | "cancelled";
 
-/** A bounded output delta and the cursor for the next read. */
-export interface OutputDelta {
-  text: string;
-  nextCursor: number;
-  retainedFromCursor: number;
-  truncated: boolean;
+/** Lifecycle state for a local Harness Web service. */
+export type ServiceStatus = "starting" | "running" | "stopped" | "failed";
+
+/** Public state of one local Harness Web service. */
+export interface ServiceSnapshot {
+  serviceId: string;
+  workspace: string;
+  status: ServiceStatus;
+  webUrl: string | null;
+  browserOpened: boolean;
+  browserError: string | null;
+  startedAt: string;
+  stoppedAt: string | null;
+  processId: number | null;
+  logTail: string;
 }
 
-/** Public state returned to MCP clients for a delegated run. */
+/** Public state returned to MCP clients for one visible Web session task. */
 export interface RunSnapshot {
   runId: string;
+  serviceId: string;
+  sessionId: string;
   task: string;
   workspace: string;
+  webUrl: string;
   status: RunStatus;
   cancelRequested: boolean;
   startedAt: string;
   finishedAt: string | null;
-  exitCode: number | null;
-  signal: NodeJS.Signals | null;
-  stdout: OutputDelta;
-  stderr: OutputDelta;
+  assistantText: string;
+  lastEventSeq: number;
+  error: string | null;
 }
 
-/** Inputs needed to start a local Harness task. */
+/** Inputs needed to start a visible Harness task. */
 export interface StartRunInput {
   task: string;
   workspace: string;
+  openBrowser?: boolean | undefined;
 }
 
-/** Optional output cursors used for incremental reads. */
-export interface RunCursors {
-  stdoutCursor?: number | undefined;
-  stderrCursor?: number | undefined;
+/** Inputs needed to start or reuse a local Harness Web service. */
+export interface StartServiceInput {
+  workspace: string;
+  openBrowser?: boolean | undefined;
 }

@@ -25,9 +25,12 @@ describe("MCP server", () => {
     manager = new RunManager({
       dataDirectory: join(temporaryRoot, "data"),
       allowedRoots: [temporaryRoot],
-      commandFactory: ({ task, workspace: cwd }): HarnessCommand => ({
+      startupTimeoutMs: 2_000,
+      pollIntervalMs: 10,
+      openBrowser: async () => undefined,
+      commandFactory: ({ workspace: cwd }): HarnessCommand => ({
         command: process.execPath,
-        args: [fixture, "success", task],
+        args: [fixture],
         cwd,
         env: { ...process.env },
       }),
@@ -52,7 +55,11 @@ describe("MCP server", () => {
       "doctor",
       "get_run",
       "list_runs",
+      "list_services",
+      "open_service",
       "start_run",
+      "start_service",
+      "stop_service",
       "wait_run",
     ]);
   });
@@ -74,8 +81,7 @@ describe("MCP server", () => {
     expect(wait.structuredContent).toMatchObject({
       runId,
       status: "succeeded",
-      exitCode: 0,
-      stdout: { text: "completed:MCP task\n" },
+      assistantText: "completed:MCP task",
     });
   });
 

@@ -1,6 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
-import { spawnSync } from "node:child_process";
 
 export const DEFAULT_HARNESS_PACKAGE = "@deepseek-ai/dsh@0.1.0-rc.6";
 
@@ -12,14 +12,13 @@ export interface HarnessCommand {
   env: NodeJS.ProcessEnv;
 }
 
-/** Values required to construct a local Harness command. */
-export interface HarnessCommandInput {
-  task: string;
+/** Values required to construct a local Harness Web command. */
+export interface HarnessWebCommandInput {
   workspace: string;
-  runHome: string;
+  serviceHome: string;
 }
 
-/** Resolves the persistent data directory used for local run state. */
+/** Resolves the persistent data directory used for local Web service state. */
 export function resolveDataDirectory(env: NodeJS.ProcessEnv = process.env): string {
   const configured = env.DSH_MCP_DATA_DIR?.trim() || env.PLUGIN_DATA?.trim();
   return configured || join(homedir(), ".deep-seek-harness-mcp");
@@ -33,9 +32,9 @@ export function resolveAllowedRoots(env: NodeJS.ProcessEnv = process.env): strin
     .filter(Boolean);
 }
 
-/** Builds the argv and environment for the published DeepSeek Harness CLI. */
-export function buildHarnessCommand(
-  input: HarnessCommandInput,
+/** Builds the argv and environment for the published Harness Web UI. */
+export function buildHarnessWebCommand(
+  input: HarnessWebCommandInput,
   env: NodeJS.ProcessEnv = process.env,
 ): HarnessCommand {
   const command = env.DSH_MCP_NPX_COMMAND?.trim() || (process.platform === "win32" ? "npx.cmd" : "npx");
@@ -46,12 +45,12 @@ export function buildHarnessCommand(
 
   return {
     command,
-    args: ["--yes", harnessPackage, "--profile", "headless", input.task],
+    args: ["--yes", harnessPackage, "web", "--port", "0"],
     cwd: input.workspace,
     env: {
       ...env,
       DSH_CWD: input.workspace,
-      DSH_HOME: input.runHome,
+      DSH_HOME: input.serviceHome,
       DSH_PERMISSION_MODE: env.DSH_PERMISSION_MODE?.trim() || "workspace-write",
       DSH_TELEMETRY_DISABLED: env.DSH_TELEMETRY_DISABLED?.trim() || "1",
       NO_COLOR: "1",
@@ -63,11 +62,7 @@ export function buildHarnessCommand(
 /** Returns local prerequisites without making a network request. */
 export function inspectRuntime(env: NodeJS.ProcessEnv = process.env): Record<string, unknown> {
   const command = env.DSH_MCP_NPX_COMMAND?.trim() || (process.platform === "win32" ? "npx.cmd" : "npx");
-  const probe = spawnSync(command, ["--version"], {
-    encoding: "utf8",
-    shell: false,
-    timeout: 5_000,
-  });
+  const probe = spawnSync(command, ["--version"], { encoding: "utf8", shell: false, timeout: 5_000 });
   const nodeMajor = Number.parseInt(process.versions.node.split(".")[0] ?? "0", 10);
 
   return {
@@ -83,5 +78,6 @@ export function inspectRuntime(env: NodeJS.ProcessEnv = process.env): Record<str
     apiKeyInEnvironment: Boolean(env.DEEPSEEK_API_KEY?.trim()),
     dataDirectory: resolveDataDirectory(env),
     allowedWorkspaceRoots: resolveAllowedRoots(env),
+    surface: "web",
   };
 }
