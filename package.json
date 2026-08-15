@@ -1,7 +1,7 @@
 {
   "name": "deepseek-harness-for-codex",
-  "version": "0.3.1",
-  "description": "Codex plugin for delegating work to visible local DeepSeek Harness sessions and independently reviewing the results.",
+  "version": "0.4.0",
+  "description": "Codex plugin for controlling visible local DeepSeek Harness sessions, queues, subagents, and human interactions.",
   "type": "module",
   "bin": {
     "deepseek-harness-for-codex": "dist/bin.mjs"
@@ -52,6 +52,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-host-apiproxy": "0.1.0-rc.6",
     "@types/node": "22.20.0",
     "tsdown": "0.22.14",
     "typescript": "6.0.3",
