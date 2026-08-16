@@ -6,29 +6,14 @@ import {
   buildHarnessWebCommand,
   resolveAllowedRoots,
   resolveDataDirectory,
-  resolveProcessInvocation,
   type HarnessCommand,
 } from "./runtime.js";
-import { HarnessClient, type MuxRequest } from "./harness-client.js";
-import type {
-  HarnessQuestionAnswer,
-  PendingInteraction,
-  RunSnapshot,
-  RunStatus,
-  ServiceSnapshot,
-  ServiceStatus,
-  SessionQueueSnapshot,
-  StartRunInput,
-  StartServiceInput,
-  WaitReason,
-} from "./types.js";
+import type { RunSnapshot, RunStatus, ServiceSnapshot, ServiceStatus, StartRunInput, StartServiceInput } from "./types.js";
 
 const READY_PATTERN = /dsh web: (http:\/\/[^\s]+)/;
 const STARTUP_TIMEOUT_MS = 120_000;
 const CANCEL_GRACE_MS = 5_000;
 const MAX_LOG_CHARACTERS = 100_000;
-const MAX_HISTORY_MESSAGES = 100;
-const CONTROL_RECONNECT_MAX_MS = 2_000;
 
 interface ServiceRecord {
   serviceId: string;
@@ -41,15 +26,6 @@ interface ServiceRecord {
   stoppedAt: Date | null;
   child: ChildProcess;
   log: string;
-  client: HarnessClient | null;
-  harnessVersion: string | null;
-  controlConnected: boolean;
-  controlError: string | null;
-  controlAbort: AbortController | null;
-  controlTask: Promise<void> | null;
-  queues: Map<string, { observed: boolean; items: unknown[] }>;
-  pendingInteractions: Map<string, PendingInteraction>;
-  submittingInteractions: Set<string>;
 }
 
 interface RunRecord {
@@ -70,6 +46,10 @@ interface RunRecord {
   error: string | null;
 }
 
+interface RpcEnvelope<T> {
+  result: { ok: true; value: T } | { ok: false; error: { code: string; message: string } };
+}
+
 interface SessionSummary {
   sessionId: string;
   running: boolean;
@@ -78,20 +58,6 @@ interface SessionSummary {
 
 interface HistoryEvent {
   event: { type: string; seq: number; data: unknown };
-  view?: unknown;
-}
-
-interface HistoryResult {
-  events: HistoryEvent[];
-  hasMore: boolean;
-  projections?: unknown;
-}
-
-interface SubagentEntry {
-  kind: "child" | "diagnostic";
-  id: string;
-  mode?: "one-shot" | "continuable";
-  [key: string]: unknown;
 }
 
 /** Options for replacing process, browser, and Web command creation in tests. */
@@ -106,8 +72,7 @@ export interface RunManagerOptions {
 }
 
 function defaultSpawnProcess(command: HarnessCommand): ChildProcess {
-  const invocation = resolveProcessInvocation(command.command, command.args, command.env);
-  return spawn(invocation.command, invocation.args, {
+  return spawn(command.command, command.args, {
     cwd: command.cwd,
     env: command.env,
     detached: process.platform !== "win32",
@@ -225,194 +190,6 @@ export class RunManager {
     return [...this.services.values()].map((service) => this.serviceSnapshot(service));
   }
 
-  /** Creates an ordinary session in a running service's workspace. */
-  public async createSession(serviceId: string, agentPreset?: string): Promise<object> {
-    const service = this.requireRunningService(serviceId);
-    const workspace = await this.call<{ workspace: { workspaceId: string } }>(service, "workspace.create", { path: service.workspace });
-    const payload: { workspaceId: string; agentPreset?: string } = { workspaceId: workspace.workspace.workspaceId };
-    if (agentPreset !== undefined) payload.agentPreset = agentPreset;
-    return this.call<object>(service, "session.create", payload);
-  }
-
-  /** Lists all persisted ordinary sessions visible to a running service. */
-  public async listSessions(serviceId: string): Promise<object> {
-    return this.call<object>(this.requireRunningService(serviceId), "session.list", {});
-  }
-
-  /** Reads one raw, message-aligned history page with tool views and projections intact. */
-  public async readSession(serviceId: string, sessionId: string, beforeSeq?: number, maxMessages = 20): Promise<object> {
-    const payload: { sessionId: string; beforeSeq?: number; maxMessages: number } = {
-      sessionId,
-      maxMessages: Math.min(Math.max(maxMessages, 1), MAX_HISTORY_MESSAGES),
-    };
-    if (beforeSeq !== undefined) payload.beforeSeq = beforeSeq;
-    return this.call<object>(this.requireRunningService(serviceId), "session.history", payload);
-  }
-
-  /** Queues text for an ordinary session's next turn and returns the pre-call history cursor. */
-  public async queueSessionMessage(serviceId: string, sessionId: string, text: string): Promise<object> {
-    const service = this.requireRunningService(serviceId);
-    const history = await this.call<HistoryResult>(service, "session.history", { sessionId, maxMessages: 1 });
-    const afterSeq = history.events.reduce((highest, entry) => Math.max(highest, entry.event.seq), -1);
-    const receipt = await this.call<object>(service, "session.prompt", {
-      sessionId,
-      mode: "queue",
-      content: [{ type: "text", text }],
-    });
-    return { ...receipt, afterSeq };
-  }
-
-  /** Steers only the currently active turn; Harness rejects idle sessions. */
-  public async steerSession(serviceId: string, sessionId: string, text: string): Promise<object> {
-    return this.call<object>(this.requireRunningService(serviceId), "session.prompt", {
-      sessionId,
-      mode: "steer",
-      content: [{ type: "text", text }],
-    });
-  }
-
-  /** Waits for a turn boundary, pending interaction, service failure, or timeout. */
-  public async waitSession(serviceId: string, sessionId: string, afterSeq: number, timeoutMs: number): Promise<object> {
-    const deadline = Date.now() + Math.min(Math.max(timeoutMs, 0), 30_000);
-    while (true) {
-      const service = this.requireService(serviceId);
-      if (service.status !== "running") {
-        return { serviceId, sessionId, afterSeq, events: [], pendingInteractions: [], waitReason: "service-failed" satisfies WaitReason };
-      }
-      const pendingInteractions = this.pendingForSession(service, sessionId);
-      if (pendingInteractions.length > 0) {
-        const history = await this.historyAfter(service, sessionId, afterSeq);
-        return { serviceId, sessionId, afterSeq, ...history, pendingInteractions, waitReason: "attention" satisfies WaitReason };
-      }
-      const [list, history] = await Promise.all([
-        this.call<{ items: SessionSummary[] }>(service, "session.list", {}),
-        this.historyAfter(service, sessionId, afterSeq),
-      ]);
-      const summary = list.items.find((item) => item.sessionId === sessionId);
-      if (summary === undefined) throw new Error(`Unknown sessionId: ${sessionId}`);
-      const agentFailed = history.events.some((entry) => entry.event.type === "agent/error");
-      const turnEnded = history.events.some((entry) => entry.event.type === "turn/end");
-      if (agentFailed) {
-        return { serviceId, sessionId, afterSeq, ...history, pendingInteractions: [], waitReason: "service-failed" satisfies WaitReason };
-      }
-      if (turnEnded || (!summary.running && history.events.length > 0)) {
-        return { serviceId, sessionId, afterSeq, ...history, pendingInteractions: [], waitReason: "complete" satisfies WaitReason };
-      }
-      if (Date.now() >= deadline) {
-        return { serviceId, sessionId, afterSeq, ...history, pendingInteractions: [], waitReason: "timeout" satisfies WaitReason };
-      }
-      await this.pause(Math.min(this.pollIntervalMs, Math.max(1, deadline - Date.now())));
-    }
-  }
-
-  /** Cancels an ordinary session's active turn without stopping its Web service. */
-  public async cancelSession(serviceId: string, sessionId: string): Promise<object> {
-    return this.call<object>(this.requireRunningService(serviceId), "session.cancel", { sessionId });
-  }
-
-  /** Forks an ordinary session at a completed-turn boundary. */
-  public async forkSession(serviceId: string, sessionId: string, atSeq?: number): Promise<object> {
-    const payload: { sessionId: string; atSeq?: number } = { sessionId };
-    if (atSeq !== undefined) payload.atSeq = atSeq;
-    return this.call<object>(this.requireRunningService(serviceId), "session.fork", payload);
-  }
-
-  /** Returns the most recent authoritative Mux queue snapshot. */
-  public readSessionQueue(serviceId: string, sessionId: string): SessionQueueSnapshot {
-    const service = this.requireRunningService(serviceId);
-    const queue = service.queues.get(sessionId);
-    return { serviceId, sessionId, observed: queue?.observed ?? false, items: [...(queue?.items ?? [])] };
-  }
-
-  /** Edits one pending queued message. */
-  public async editQueuedMessage(serviceId: string, sessionId: string, itemId: string, text: string): Promise<object> {
-    return this.updateQueue(serviceId, sessionId, itemId, { kind: "edit", content: [{ type: "text", text }] });
-  }
-
-  /** Removes one pending queued message. */
-  public async removeQueuedMessage(serviceId: string, sessionId: string, itemId: string): Promise<object> {
-    return this.updateQueue(serviceId, sessionId, itemId, { kind: "remove" });
-  }
-
-  /** Changes one queued message to strict steering placement. */
-  public async steerQueuedMessage(serviceId: string, sessionId: string, itemId: string): Promise<object> {
-    return this.updateQueue(serviceId, sessionId, itemId, { kind: "steer" });
-  }
-
-  /** Lists durable direct children of one parent session. */
-  public async listSubagents(serviceId: string, parentSessionId: string): Promise<object> {
-    return this.call<object>(this.requireRunningService(serviceId), "subagent.list", { parentSessionId });
-  }
-
-  /** Reads one direct child's raw paginated history after resolving its durable mode. */
-  public async readSubagent(serviceId: string, parentSessionId: string, childSessionId: string, beforeSeq?: number, maxMessages = 20): Promise<object> {
-    const service = this.requireRunningService(serviceId);
-    const child = await this.requireSubagent(service, parentSessionId, childSessionId);
-    const payload: { parentSessionId: string; childSessionId: string; mode: "one-shot" | "continuable"; beforeSeq?: number; maxMessages: number } = {
-      parentSessionId,
-      childSessionId,
-      mode: child.mode,
-      maxMessages: Math.min(Math.max(maxMessages, 1), MAX_HISTORY_MESSAGES),
-    };
-    if (beforeSeq !== undefined) payload.beforeSeq = beforeSeq;
-    return this.call<object>(service, "subagent.history", payload);
-  }
-
-  /** Delivers text only to a continuable direct child. */
-  public async sendSubagentMessage(serviceId: string, parentSessionId: string, childSessionId: string, text: string): Promise<object> {
-    const service = this.requireRunningService(serviceId);
-    await this.requireContinuableSubagent(service, parentSessionId, childSessionId);
-    return this.call<object>(service, "subagent.prompt", {
-      parentSessionId,
-      childSessionId,
-      mode: "continuable",
-      content: [{ type: "text", text }],
-    });
-  }
-
-  /** Interrupts a live continuable child; one-shot children are never targeted. */
-  public async interruptSubagent(serviceId: string, parentSessionId: string, childSessionId: string): Promise<object> {
-    const service = this.requireRunningService(serviceId);
-    await this.requireContinuableSubagent(service, parentSessionId, childSessionId);
-    return this.call<object>(service, "subagent.interrupt", { parentSessionId, childSessionId, mode: "continuable" });
-  }
-
-  /** Lists pending approval and question requests replayed by the service Mux stream. */
-  public listPendingInteractions(serviceId: string, sessionId?: string): PendingInteraction[] {
-    const service = this.requireRunningService(serviceId);
-    const interactions = [...service.pendingInteractions.values()];
-    return sessionId === undefined ? interactions : interactions.filter((interaction) => interaction.sessionId === sessionId);
-  }
-
-  /** Submits an explicit one-time approval and waits for a later resolved frame to remove it. */
-  public async approveHarnessAction(serviceId: string, sessionId: string, approvalId: string): Promise<PendingInteraction> {
-    return this.respondToApproval(serviceId, sessionId, approvalId, "allowed-once");
-  }
-
-  /** Rejects one pending Harness approval. */
-  public async rejectHarnessAction(serviceId: string, sessionId: string, approvalId: string): Promise<PendingInteraction> {
-    return this.respondToApproval(serviceId, sessionId, approvalId, "rejected");
-  }
-
-  /** Answers one pending Harness question batch. */
-  public async answerHarnessQuestion(serviceId: string, sessionId: string, rpcId: string, answers: HarnessQuestionAnswer[]): Promise<PendingInteraction> {
-    const service = this.requireRunningService(serviceId);
-    const key = `question:${rpcId}`;
-    const interaction = service.pendingInteractions.get(key);
-    if (interaction?.kind !== "question" || interaction.sessionId !== sessionId || interaction.responseSubmitted || service.submittingInteractions.has(key)) {
-      throw new Error(`not-pending: Harness question ${rpcId} is not awaiting a response.`);
-    }
-    service.submittingInteractions.add(key);
-    try {
-      await this.requireClient(service).respond(rpcId, { sessionId, answer: { answers } });
-      const submitted = { ...interaction, responseSubmitted: true };
-      if (service.pendingInteractions.get(key)?.rpcId === rpcId) service.pendingInteractions.set(key, submitted);
-      return submitted;
-    } finally {
-      service.submittingInteractions.delete(key);
-    }
-  }
-
   /** Stops one Web service and its active sessions. */
   public async stopService(serviceId: string): Promise<ServiceSnapshot> {
     const service = this.requireService(serviceId);
@@ -433,19 +210,19 @@ export class RunManager {
     const serviceSnapshot = await this.startService({ workspace: input.workspace, openBrowser: false });
     if (serviceSnapshot.webUrl === null) throw new Error("Harness Web service did not provide a URL.");
     const service = this.requireService(serviceSnapshot.serviceId);
-    const workspaceResult = await this.call<{ workspace: { workspaceId: string } }>(service, "workspace.create", { path: service.workspace });
+    const workspaceResult = await this.rpc<{ workspace: { workspaceId: string } }>(service, "workspace.create", { path: service.workspace });
     const requestedSessionId = input.sessionId?.trim();
     let sessionId: string;
     let startEventSeq = -1;
     if (requestedSessionId === undefined || requestedSessionId === "") {
-      const session = await this.call<{ sessionId: string }>(service, "session.create", {
+      const session = await this.rpc<{ sessionId: string }>(service, "session.create", {
         workspaceId: workspaceResult.workspace.workspaceId,
       });
       sessionId = session.sessionId;
     } else {
       const [list, history] = await Promise.all([
-        this.call<{ items: SessionSummary[] }>(service, "session.list", {}),
-        this.call<HistoryResult>(service, "session.history", { sessionId: requestedSessionId, maxMessages: 50 }),
+        this.rpc<{ items: SessionSummary[] }>(service, "session.list", {}),
+        this.rpc<{ events: HistoryEvent[] }>(service, "session.history", { sessionId: requestedSessionId, maxMessages: 50 }),
       ]);
       const summary = list.items.find((item) => item.sessionId === requestedSessionId);
       if (summary === undefined) throw new Error(`Unknown sessionId for this workspace: ${requestedSessionId}`);
@@ -457,7 +234,7 @@ export class RunManager {
     if (this.activeSessions.has(activeSessionKey)) throw new Error(`Harness session already has an active MCP run: ${sessionId}`);
     this.activeSessions.add(activeSessionKey);
     try {
-      await this.call<{ accepted: true }>(service, "session.prompt", {
+      await this.rpc<{ accepted: true }>(service, "session.prompt", {
         sessionId,
         mode: "queue",
         content: [{ type: "text", text: task }],
@@ -509,14 +286,11 @@ export class RunManager {
     const run = this.requireRun(runId);
     const deadline = Date.now() + Math.min(Math.max(timeoutMs, 0), 30_000);
     let snapshot = await this.refresh(run);
-    while (snapshot.status === "running" && snapshot.pendingInteractions.length === 0 && Date.now() < deadline) {
-      await this.pause(Math.min(this.pollIntervalMs, Math.max(1, deadline - Date.now())));
+    while (snapshot.status === "running" && Date.now() < deadline) {
+      await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, Math.min(this.pollIntervalMs, Math.max(1, deadline - Date.now()))));
       snapshot = await this.refresh(run);
     }
-    const waitReason: WaitReason = snapshot.pendingInteractions.length > 0
-      ? "attention"
-      : snapshot.status === "running" ? "timeout" : "complete";
-    return { ...snapshot, waitReason };
+    return snapshot;
   }
 
   /** Cancels the Harness agent turn without stopping the visible Web service. */
@@ -525,7 +299,7 @@ export class RunManager {
     if (run.status === "running") {
       run.cancelRequested = true;
       const service = this.requireService(run.serviceId);
-      await this.call<{ accepted: true }>(service, "session.cancel", { sessionId: run.sessionId });
+      await this.rpc<{ accepted: true }>(service, "session.cancel", { sessionId: run.sessionId });
     }
     return this.refresh(run);
   }
@@ -555,15 +329,6 @@ export class RunManager {
       stoppedAt: null,
       child,
       log: "",
-      client: null,
-      harnessVersion: null,
-      controlConnected: false,
-      controlError: null,
-      controlAbort: null,
-      controlTask: null,
-      queues: new Map(),
-      pendingInteractions: new Map(),
-      submittingInteractions: new Set(),
     };
     this.services.set(serviceId, service);
     this.serviceByWorkspace.set(workspace, serviceId);
@@ -574,9 +339,10 @@ export class RunManager {
       const onChunk = (chunk: string): void => {
         service.log = `${service.log}${chunk}`.slice(-MAX_LOG_CHARACTERS);
         const url = READY_PATTERN.exec(service.log)?.[1];
-        if (url !== undefined && service.status === "starting" && service.webUrl === null) {
+        if (url !== undefined && service.status === "starting") {
           clearTimeout(timer);
           service.webUrl = url;
+          service.status = "running";
           resolveReady();
         }
       };
@@ -590,27 +356,16 @@ export class RunManager {
       child.once("close", (code, signal) => {
         clearTimeout(timer);
         service.stoppedAt = new Date();
-        service.controlAbort?.abort();
         if (service.status === "starting") {
           service.status = "failed";
           reject(new Error(`Harness Web service exited before readiness (code ${String(code)}, signal ${String(signal)}). ${service.log}`));
         } else if (service.status === "running") {
           service.status = code === 0 ? "stopped" : "failed";
-          service.controlConnected = false;
         }
       });
     });
     try {
       await ready;
-      if (service.webUrl === null) throw new Error("Harness Web service did not provide a URL.");
-      service.client = new HarnessClient(service.webUrl);
-      const description = await service.client.rpc<{ version: string }>("host.describe", {});
-      service.harnessVersion = description.version;
-      await this.startControl(service);
-      if (service.child.exitCode !== null || service.status === "failed") {
-        throw new Error("Harness Web service exited while its control stream was connecting.");
-      }
-      service.status = "running";
       return service;
     } catch (error) {
       this.serviceByWorkspace.delete(workspace);
@@ -632,8 +387,8 @@ export class RunManager {
     }
     try {
       const [list, history] = await Promise.all([
-        this.call<{ items: SessionSummary[] }>(service, "session.list", {}),
-        this.historyAfter(service, run.sessionId, run.startEventSeq),
+        this.rpc<{ items: SessionSummary[] }>(service, "session.list", {}),
+        this.rpc<{ events: HistoryEvent[] }>(service, "session.history", { sessionId: run.sessionId, maxMessages: 50 }),
       ]);
       const summary = list.items.find((item) => item.sessionId === run.sessionId);
       const events = history.events.filter((entry) => entry.event.seq > run.startEventSeq);
@@ -659,205 +414,18 @@ export class RunManager {
     return this.runSnapshot(run);
   }
 
-  private async call<T>(service: ServiceRecord, method: string, payload: unknown): Promise<T> {
-    return this.requireClient(service).rpc<T>(method, payload);
-  }
-
-  private async startControl(service: ServiceRecord): Promise<void> {
-    const controller = new AbortController();
-    service.controlAbort = controller;
-    let resolveOpen: (() => void) | undefined;
-    const firstOpen = new Promise<void>((resolvePromise) => { resolveOpen = resolvePromise; });
-    service.controlTask = this.monitorControl(service, controller.signal, () => resolveOpen?.());
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    try {
-      await Promise.race([
-        firstOpen,
-        new Promise<never>((_, reject) => {
-          timeout = setTimeout(
-            () => reject(new Error(`Harness control stream did not connect within ${String(this.startupTimeoutMs)}ms.`)),
-            this.startupTimeoutMs,
-          );
-        }),
-      ]);
-    } catch (error) {
-      controller.abort();
-      await service.controlTask;
-      throw error;
-    } finally {
-      if (timeout !== undefined) clearTimeout(timeout);
-    }
-  }
-
-  private async monitorControl(service: ServiceRecord, signal: AbortSignal, onFirstOpen: () => void): Promise<void> {
-    let delayMs = 100;
-    let opened = false;
-    while (!signal.aborted) {
-      service.queues.clear();
-      service.pendingInteractions.clear();
-      try {
-        await this.requireClient(service).readMux(
-          signal,
-          () => {
-            service.controlConnected = true;
-            service.controlError = null;
-            delayMs = 100;
-            if (!opened) {
-              opened = true;
-              onFirstOpen();
-            }
-          },
-          (request) => this.acceptMuxFrame(service, request),
-        );
-        if (!signal.aborted) throw new Error("Harness control stream closed.");
-      } catch (error) {
-        if (signal.aborted) return;
-        service.controlConnected = false;
-        service.controlError = errorText(error);
-        service.queues.clear();
-        service.pendingInteractions.clear();
-        await this.pauseUntilAbort(delayMs, signal);
-        delayMs = Math.min(delayMs * 2, CONTROL_RECONNECT_MAX_MS);
-      }
-    }
-  }
-
-  private acceptMuxFrame(service: ServiceRecord, request: MuxRequest): void {
-    const frame = request.payload;
-    switch (frame.type) {
-      case "session/subscribed":
-        service.queues.set(frame.sessionId, { observed: true, items: [] });
-        return;
-      case "session/queue":
-        service.queues.set(frame.sessionId, { observed: true, items: frame.items });
-        return;
-      case "approval/requested": {
-        const interaction: PendingInteraction = {
-          kind: "approval",
-          rpcId: request.rpcId,
-          sessionId: frame.sessionId,
-          approvalId: frame.approvalId,
-          toolName: frame.toolName,
-          responseSubmitted: false,
-        };
-        if (frame.callId !== undefined) interaction.callId = frame.callId;
-        if (frame.reason !== undefined) interaction.reason = frame.reason;
-        service.pendingInteractions.set(`approval:${frame.approvalId}`, interaction);
-        return;
-      }
-      case "approval/resolved":
-        service.pendingInteractions.delete(`approval:${frame.approvalId}`);
-        return;
-      case "question/requested":
-        service.pendingInteractions.set(`question:${request.rpcId}`, {
-          kind: "question",
-          rpcId: request.rpcId,
-          sessionId: frame.sessionId,
-          questions: frame.questions,
-          responseSubmitted: false,
-        });
-        return;
-      case "question/resolved":
-        service.pendingInteractions.delete(`question:${frame.questionRpcId}`);
-        return;
-      default:
-        return;
-    }
-  }
-
-  private async historyAfter(service: ServiceRecord, sessionId: string, afterSeq: number): Promise<HistoryResult> {
-    const tail = await this.call<HistoryResult>(service, "session.history", { sessionId, maxMessages: MAX_HISTORY_MESSAGES });
-    let events = tail.events;
-    let hasMore = tail.hasMore;
-    let firstSeq = events[0]?.event.seq;
-    while (hasMore && firstSeq !== undefined && firstSeq > afterSeq + 1) {
-      const older = await this.call<HistoryResult>(service, "session.history", {
-        sessionId,
-        beforeSeq: firstSeq,
-        maxMessages: MAX_HISTORY_MESSAGES,
-      });
-      if (older.events.length === 0) break;
-      events = [...older.events, ...events];
-      hasMore = older.hasMore;
-      firstSeq = events[0]?.event.seq;
-    }
-    return { ...tail, hasMore, events: events.filter((entry) => entry.event.seq > afterSeq) };
-  }
-
-  private pendingForSession(service: ServiceRecord, sessionId: string): PendingInteraction[] {
-    return [...service.pendingInteractions.values()].filter((interaction) => interaction.sessionId === sessionId);
-  }
-
-  private async updateQueue(serviceId: string, sessionId: string, itemId: string, action: object): Promise<object> {
-    return this.call<object>(this.requireRunningService(serviceId), "session.updateQueue", { sessionId, itemId, action });
-  }
-
-  private async requireSubagent(service: ServiceRecord, parentSessionId: string, childSessionId: string): Promise<{ mode: "one-shot" | "continuable" }> {
-    const catalog = await this.call<{ entries: SubagentEntry[] }>(service, "subagent.list", { parentSessionId });
-    const child = catalog.entries.find((entry) => entry.kind === "child" && entry.id === childSessionId);
-    if (child === undefined || child.kind !== "child" || child.mode === undefined) {
-      throw new Error(`Unknown or unavailable subagent: ${childSessionId}`);
-    }
-    return { mode: child.mode };
-  }
-
-  private async requireContinuableSubagent(service: ServiceRecord, parentSessionId: string, childSessionId: string): Promise<void> {
-    const child = await this.requireSubagent(service, parentSessionId, childSessionId);
-    if (child.mode !== "continuable") throw new Error(`Subagent ${childSessionId} is one-shot and cannot be controlled.`);
-  }
-
-  private async respondToApproval(
-    serviceId: string,
-    sessionId: string,
-    approvalId: string,
-    outcome: "allowed-once" | "rejected",
-  ): Promise<PendingInteraction> {
-    const service = this.requireRunningService(serviceId);
-    const key = `approval:${approvalId}`;
-    const interaction = service.pendingInteractions.get(key);
-    if (interaction?.kind !== "approval" || interaction.sessionId !== sessionId || interaction.responseSubmitted || service.submittingInteractions.has(key)) {
-      throw new Error(`not-pending: Harness approval ${approvalId} is not awaiting a response.`);
-    }
-    service.submittingInteractions.add(key);
-    try {
-      await this.requireClient(service).respond(interaction.rpcId, { sessionId, approvalId, outcome });
-      const submitted = { ...interaction, responseSubmitted: true };
-      if (service.pendingInteractions.get(key)?.rpcId === interaction.rpcId) service.pendingInteractions.set(key, submitted);
-      return submitted;
-    } finally {
-      service.submittingInteractions.delete(key);
-    }
-  }
-
-  private requireClient(service: ServiceRecord): HarnessClient {
-    if (service.client === null) throw new Error("Harness Web control client is not initialized.");
-    return service.client;
-  }
-
-  private requireRunningService(serviceId: string): ServiceRecord {
-    const service = this.requireService(serviceId);
-    if (service.status !== "running" || !service.controlConnected) {
-      throw new Error(`Harness Web service control is unavailable: ${service.controlError ?? service.status}`);
-    }
-    return service;
-  }
-
-  private async pause(milliseconds: number): Promise<void> {
-    await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, milliseconds));
-  }
-
-  private async pauseUntilAbort(milliseconds: number, signal: AbortSignal): Promise<void> {
-    await new Promise<void>((resolvePromise) => {
-      const onAbort = (): void => {
-        clearTimeout(timer);
-        resolvePromise();
-      };
-      const timer = setTimeout(() => {
-        signal.removeEventListener("abort", onAbort);
-        resolvePromise();
-      }, milliseconds);
-      signal.addEventListener("abort", onAbort, { once: true });
+  private async rpc<T>(service: ServiceRecord, method: string, payload: unknown): Promise<T> {
+    if (service.webUrl === null) throw new Error("Harness Web service has no URL.");
+    const response = await fetch(`${service.webUrl}/api/${method}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "client-request", rpcId: `mcp-${randomUUID()}`, method, payload }),
+      signal: AbortSignal.timeout(15_000),
     });
+    if (!response.ok) throw new Error(`${method} failed over HTTP ${String(response.status)}: ${await response.text()}`);
+    const body = await response.json() as RpcEnvelope<T>;
+    if (!body.result.ok) throw new Error(`${method} failed: ${body.result.error.code}: ${body.result.error.message}`);
+    return body.result.value;
   }
 
   private async resolveWorkspace(input: string): Promise<string> {
@@ -894,17 +462,7 @@ export class RunManager {
   }
 
   private async terminate(service: ServiceRecord): Promise<void> {
-    service.controlAbort?.abort();
-    await service.controlTask;
-    service.controlConnected = false;
-    service.queues.clear();
-    service.pendingInteractions.clear();
-    service.submittingInteractions.clear();
-    if (service.child.exitCode !== null) {
-      service.status = service.status === "failed" ? "failed" : "stopped";
-      this.serviceByWorkspace.delete(service.workspace);
-      return;
-    }
+    if (service.child.exitCode !== null) return;
     const closed = new Promise<void>((resolveClose) => service.child.once("close", () => resolveClose()));
     if (process.platform !== "win32" && service.child.pid !== undefined) {
       try { process.kill(-service.child.pid, "SIGTERM"); } catch { service.child.kill("SIGTERM"); }
@@ -926,9 +484,6 @@ export class RunManager {
       webUrl: service.webUrl,
       browserOpened: service.browserOpened,
       browserError: service.browserError,
-      harnessVersion: service.harnessVersion,
-      controlConnected: service.controlConnected,
-      controlError: service.controlError,
       startedAt: service.startedAt.toISOString(),
       stoppedAt: service.stoppedAt?.toISOString() ?? null,
       processId: service.child.pid ?? null,
@@ -952,7 +507,6 @@ export class RunManager {
       assistantText: run.assistantText,
       lastEventSeq: run.lastEventSeq,
       error: run.error,
-      pendingInteractions: this.pendingForSession(this.requireService(run.serviceId), run.sessionId),
     };
   }
 }

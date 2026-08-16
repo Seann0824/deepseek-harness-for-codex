@@ -1,21 +1,21 @@
 {
   "name": "deepseek-harness-for-codex",
-  "version": "0.4.0",
-  "description": "Delegate work and control sessions, queues, subagents, and human interactions through a visible local DeepSeek Harness Web service.",
+  "version": "0.3.1",
+  "description": "Delegate coding work through a visible local DeepSeek Harness Web session and inspect the result from Codex.",
   "author": {
     "name": "DeepSeek Harness for Codex contributors"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "DeepSeek Harness for Codex",
-    "shortDescription": "Run, watch, and control a local DeepSeek agent.",
-    "longDescription": "Codex starts the local DeepSeek Harness Web UI, controls existing sessions, queues, continuable subagents, and human interactions, and independently reviews workspace changes.",
+    "shortDescription": "Run and watch a local DeepSeek coding agent.",
+    "longDescription": "Codex starts the local DeepSeek Harness Web UI, returns a clickable live-session link, delegates a scoped coding task, and independently reviews the workspace changes.",
     "developerName": "DeepSeek Harness for Codex contributors",
     "category": "Developer Tools",
     "brandColor": "#19DDEB",
     "composerIcon": "./assets/icon.png",
     "logo": "./assets/icon.png",
-    "capabilities": ["Visible Harness Web UI", "Session and queue control", "Continuable subagent control", "Human interaction handling", "Independent result review"],
+    "capabilities": ["Visible Harness Web UI", "Local agent delegation", "Independent result review"],
     "defaultPrompt": "Start the local DeepSeek Harness Web UI without opening my browser, give me its clickable session link, delegate this coding task, then review and verify the result yourself."
   },
   "mcpServers": "./.mcp.json"
